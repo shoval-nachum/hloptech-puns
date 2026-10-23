@@ -1,0 +1,905 @@
+
+<script>
+(() => {
+document.documentElement.lang = 'en'; document.documentElement.dir = 'ltr';
+const RAW = JSON.parse(document.getElementById('data').textContent);
+const PHOTOS = (() => { try { return JSON.parse(document.getElementById('avatars').textContent); } catch { return {}; } })();
+const AUTH = {
+  s:{name:'Shoval', ini:'S', photo:PHOTOS.s},
+  a:{name:'Amiram', ini:'A', photo:PHOTOS.a},
+  d:{name:'David', ini:'D', photo:PHOTOS.d}
+};
+
+/* ---------- topics: keyword rules, first match wins ---------- */
+const HB = '[\\u0590-\\u05FF]';
+const w = s => `(?<!${HB})(?:${s})(?!${HB})`;          // whole Hebrew word
+const TOPICS = [
+  {id:'beit', name:'Beit Hayer', emoji:'🏘️', re:/בית ?ח'?א?י?יר|ביתח'?א?י?יר|חאייר|בית'חייר/},
+  {id:'naughty', name:'Naughty', emoji:'🍑', re:new RegExp('זין|דיק|dick|פורנו|porn|סקס|sex|ציצ|tit|boob|butt|באט|פלאג|plug|זונ|שרמוט|חרמ|ויבר|דילדו|dildo|אורגי|זיונ|fuck|זקפ|ג.יז|jizz|שפיכ|בתול|מציצ|cum|ציקלופ|גרזן|nude|עירום|ערום|חשפ|לולת|only fans|הומו|גיי|gay|להט|כוסית|'+w('כוס')+'|'+w('פות')+'|ass\\b|bdsm|sub\\b|נאוף|ניאוף|בגיד|בוגדת|pussy|מישמיש|סטוצ','i')},
+  {id:'potty', name:'Potty', emoji:'💩', re:/חרא|חרב|קקי|קקה|פליץ|פלוץ|פלוצ|fart|poo|שירותים|אסלה|toilet|נאד|שלשל|גזים|terd|dung|טחור|חירבון|מחרבן|קקטון|מסריח|צחנ/i},
+  {id:'army', name:'War & Army', emoji:'🪖', re:/צה"ל|צבא|טיל|טנק|חמאס|מילואים|מלחמ|פצצ|פצמ|נשק|רובה|שב[״"]כ|ממ"ד|ממד|מקלט|שלטר|עורף|גדוד|פיקוד|מחבל|טרור|ג'יהאד|ג'האד|בזוק|חייל|שמירה|ימ"מ|ימ״מ|נגמ"ש|מרכבה|רקט|דרון|מבצע|יורה|גולני|מטוסי קרב|ג'ובניק|משתמט|lamethrower/i},
+  {id:'holy', name:'Holy Stuff', emoji:'🕍', re:new RegExp(w('רב|הרב|רבי|הרבי')+'|רבנ|חרד|דוס|תורה|תפיל|כשר|פסח|ברכ|מוהל|ברית|גיור|נזיר|nun|ישיב|שבת|פורים|ל"ג|ל״ג|בעומר|כיפור|ראש השנה|מצה|קדוש|אללה|allah|מסגד|נוצר|רמאד|משה רבינו|אליהו|נביא|rabbi|jew|ג.ו.י','i')},
+  {id:'animals', name:'Animals', emoji:'🐴', re:new RegExp('סוס|horse|'+w('דוב|דובים|הדוב|הדובים|דובי')+'|bear|'+w('עז|עיזה|עזים|עיזים|העז')+'|עיז|אלפק|כבש|'+w('פרה|פרות|הפרה')+'|בקר|תרנגול|'+w('עוף|העוף|עופות')+'|לול|ברווז|אווז|goose|duck|כלב|חתול|ארנב|rabbit|bunny|'+w('דג|דגים')+'|fish|'+w('צב|צבים')+'|turtle|נחש|'+w('קוף|קופים|הקוף|הקופים')+'|monkey|היפופו|גמל|יענ|לוטר|אוגר|hamster|דולפין|dolphin|תנין|קרוקו|קרפד|דבור|bee|צרע|ציפור|טווס|ג.ירפ|'+w('פיל')+'|חמור|זאב|חזיר|pig|מכרסם|יונק|זוחל|סנאי|בבון|baboon|beaver|ביבר|תמנון|חמוס|סמור|יתוש|שפנ|ינשוף|ג.וק|עכביש|עכבר|נמר|אריה|לטאה|dingo|ferret|גמלים|נאקות|צאן|רועה','i')},
+  {id:'food', name:'Food', emoji:'🍔', re:/בורגר|burger|פסטה|pasta|פיצ[הו]|pizza|חומוס|פלאפל|קבב|kebab|סטייק|steak|טחינ|לזני|ספגטי|טורטלי|בטט|תפוח|גבינ|חמאה|ג.חנון|מלפפון|חציל|כרוב|זוקיני|קישוא|ירק|סלט|קינוח|עוג[הת]|שוקולד|לוקום|במבה|ביסלי|נקניק|סלמי|בייקון|מאפה|לחמ|פית[הו]|חרדל|דבש|honey|מרק|ארוח|מסעד|שף|food|bread|snack|חטיף|אסאדו|שקשוק|ניוקי|קציצ|סושי|סאשימי|פול |פול$|קובה|ג.אנק|מיונז|אטליז|קצב|טוסט|פחמימ|מטבל|אפונ|קטשופ|לחמניי?ה|ממרח|חמין|כרפס|פופקורן|תות|פלפל|kinder|קפה|coffee/i},
+  {id:'drinks', name:'Booze & Smoke', emoji:'🍺', re:/בירה|beer|יין|יקב|וויסקי|אלכוהול|booz|שיכור|שתיה|שתייה|מסטול|סטלה|סטלנ|וויד|weed|שכטה|ג.וינט|נרגיל|מעשן|עישון|טבק|גראס|רום |טוניק|ג.ין|שמפ|קוקטייל|קולדה|drink/i},
+  {id:'work', name:'Work & Tech', emoji:'💻', re:/gpt|בינה|גבינה מלאכותית|\bai\b|פיצ.ר|feature|ftue|\bux\b|\bui\b|מעצב|פרודקט|מנהל מוצר|מנהלת מוצר|מפתח|סטרטאפ|הייטק|היי-טק|אפליקצ|miro|מירו|monday|מנדיי|slack|סלאק|poc|באג|bug|kpi|טאסק|vpn|שרת|סרבר|מחשב|tech|אקטיב|סלוטו|גיימ|gam|משחק|פלייטיקה|קוד|script|תכנ|mockup|מוקאפ|arppu|photoshop|פוטושופ|psd|אנימטור|ארט דירקטור|art director|דירקטוריון|ישיבה שבועית|weekly|daily|revenue|רווניו|ממשק|interface|settings|template|טמפלייט|reel|release|רליס|hr\b|ביצועים|testing|טסטינג|research|מוניטיזציה|מינטוז|פרוייקט|פרויקט|מנג.ר|manager|office|אופיס|צוות|עובד|מנכ|לינקדאין|inked|זום|zoom|נוטיפיקיישן|notification|דשבורד|dashboard|tooltip|טולטיפ|בורד|board|מסך|נווט|ניווט|פלטפורמ|סטרימינג|נטפליקס|vista|android|ios|undroid|pipeline|optical|adobe|אדובי|monopoly|אמנונופול|סקופלי|pop|copy|קופי/i},
+  {id:'world', name:'World', emoji:'🌍', re:/רוס|בלרוס|אוקראינ|פולנ|גרמנ|צרפת|איטלק|אטלק|יוונ|מקסיק|הודו|הודי|תאילנד|יפני|אמריק|ארה״ב|ארהב|אירופ|נורווג|נורד|סקנדינב|קייב|מוסקב|טקסס|לונדון|פריז|בלגי|שוויצ|הונגר|בולגר|גרוז|(?<![\u0590-\u05FF])(?:סיני|סינים|סין|תאי|תאילנדי|תאילנדים)(?![\u0590-\u05FF])|תימנ|עיראק|מצרי|מצרים|סורי|אפריק|אוסטרל|קזח|מולדוב|רומני|רומנים|ברזיל|קולומב|טורק|ירדנ|איראנ|ספרד|russia|slav|נילוס|bulgar|thai|יאור|הוואי|יפן|ויקינג|vikin|סלאב|לטינ|אינדיאנ|הולנד|amsterdam|dam\b|ספארי|ג.ונגל|אסקימו|סקוטי|בדוא/i}
+];
+const MISC = {id:'misc', name:'Random', emoji:'✨'};
+const TOPIC_BY_ID = Object.fromEntries([...TOPICS, MISC].map(t => [t.id, t]));
+function topicOf(text){ for (const t of TOPICS) if (t.re.test(text)) return t.id; return 'misc'; }
+
+/* one shared palette for every post: [from, to, ink] */
+const PALS = [
+  ['#ff5e62','#ff9966','#ffffff'], ['#2f62e6','#1b3fae','#ffffff'], ['#7bd389','#3fa34d','#062810'], ['#ffd23f','#ffb400','#2a1d00'],
+  ['#f15bb5','#c43d97','#ffffff'], ['#00c2a8','#00917e','#022b25'], ['#0f172a','#1e293b','#7ef9a2'], ['#ffb347','#ff8a3d','#2b1300'],
+  ['#8ecae6','#5fa8d3','#08243a'], ['#7b2ff7','#5a17c9','#ffffff'], ['#d7263d','#a1122a','#ffffff'], ['#f4f1de','#e5ddbb','#1d3557'],
+  ['#2d6a4f','#1b4332','#d8f3dc'], ['#c79a5b','#a8743a','#fff8ec'], ['#ffc2d1','#ffa3ba','#4a0018'], ['#fee440','#f5d000','#222222'],
+  ['#121519','#2a2f36','#ffffff'], ['#00a6fb','#0582ca','#ffffff'], ['#a3c4bc','#7fa89e','#10312a'], ['#ff7aa2','#7b2ff7','#ffffff'],
+  ['#43e97b','#38f9d7','#063b2a'], ['#fa709a','#fee140','#3a0b1f'], ['#5b6b3a','#46542b','#f3f0d7'], ['#ff9a8b','#ff6a88','#ffffff']
+];
+const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
+
+/* background emoji that match the joke itself; first two distinct hits win */
+const EMO = [
+  [/סוס|horse|פגעסוס/i,'🐴'],[/(?<![֐-׿])(?:דוב|דובים|הדוב|דובי)(?![֐-׿])|bear/i,'🐻'],[/(?<![֐-׿])(?:עז|עיזה|עזים|עיזים|העז)(?![֐-׿])|עיז|goat/i,'🐐'],
+  [/(?<![֐-׿])(?:פרה|פרות|הפרה)(?![֐-׿])|בקר|carne|moo|חלב/i,'🐄'],[/תרנגול|(?<![֐-׿])(?:עוף|העוף|עופות)(?![֐-׿])|לול|chick|פרגית/i,'🐔'],
+  [/ברווז|duck|quack|קוואק/i,'🦆'],[/אווז|goose/i,'🪿'],[/כלב|dog|רטריב|קורגי|פאג/i,'🐶'],[/חתול|cat\b|מיצי/i,'🐱'],[/ארנב|rabbit|bunny|באני/i,'🐰'],
+  [/(?<![֐-׿])(?:דג|דגים)(?![֐-׿])|fish|סלמון|צלופח|חסילון/i,'🐟'],[/היפו/i,'🦛'],[/גמל|נאקות|דבשת/i,'🐪'],[/חזיר|pig|בייקון|pork/i,'🐷'],
+  [/דבור|bee|buzz|כוורת|דבש|honey/i,'🐝'],[/נחש|הכש/i,'🐍'],[/תנין|קרוקו/i,'🐊'],[/(?<![֐-׿])(?:קוף|קופים)(?![֐-׿])|monkey|שימפנ|(?<![\u0590-\u05FF])בבון|baboon/i,'🐒'],
+  [/(?<![֐-׿])פיל(?![֐-׿])|elef|elephant/i,'🐘'],[/ג.ירפ/i,'🦒'],[/אלפק/i,'🦙'],[/(?<![֐-׿])צב(?![֐-׿])|turtle/i,'🐢'],
+  [/תמנון|octo|טופוס/i,'🐙'],[/דולפין|dolphin|לוויתן|whale/i,'🐬'],[/ינשוף|ינשמת/i,'🦉'],[/עכביש|spider/i,'🕷️'],[/אוגר|hamster|מכרסם|עכבר|קביה|גרביל/i,'🐹'],
+  [/כבש|צמר|wool|טלה|צאן|רועה/i,'🐑'],[/יענ/i,'🪶'],[/לוטר/i,'🦦'],[/טווס/i,'🦚'],[/נמר|cheeta/i,'🐆'],[/סנאי|(?<![\u0590-\u05FF])בלוט(?![\u0590-\u05FF])/i,'🐿️'],[/ביבר|beaver/i,'🦫'],[/יתוש/i,'🦟'],
+  [/בורגר|burger/i,'🍔'],[/פיצ[הו]|pizza/i,'🍕'],[/פסטה|pasta|ספגטי|טורטלי|לזני|ניוקי|קרבונרה|גרבונרה|איטריות/i,'🍝'],[/חומוס|פלאפל|פול /i,'🧆'],
+  [/קבב|kebab|שיפוד/i,'🍢'],[/סטייק|steak|קצב|אטליז|אומצה|נתח|בשר|אסאדו/i,'🥩'],[/בטט|תפוח אדמה|תפוחי אדמה|תפוד|קרטוש|פטטה|צ.יפס/i,'🥔'],[/גבינ|קשקב/i,'🧀'],
+  [/קפה|coffee|קפאין/i,'☕'],[/בירה|beer|בירוונה|טובורג/i,'🍺'],[/יין|יקב|ענבים|שמפ/i,'🍷'],[/עוג[הת]|קינוח|סופגני|צופגני|מאפה|בקלאווה/i,'🍰'],[/שוקולד|kinder/i,'🍫'],
+  [/חציל|eggplant/i,'🍆'],[/מלפפון|זוקיני|קישוא|cucumber|zucchini|זוקי/i,'🥒'],[/כרוב|חסה|ירק|סלט/i,'🥬'],[/תות/i,'🍓'],[/לחם|בגט|פית[הו]|bread|לחמני/i,'🥖'],
+  [/ביצ[הי]|שקשוק|חביתה/i,'🥚'],[/נקניק|סלמי|נקניקי/i,'🌭'],[/סושי|סאשימי/i,'🍣'],[/מקסיק|טורטיה|בוריטו|חסוס|חוזה|קסדייה|גוואקמולי|קוואקאמולי/i,'🌮'],[/פלפל|חריף|חאריף/i,'🌶️'],
+  [/לימון/i,'🍋'],[/תפוח(?! אדמה)|תפוחית/i,'🍎'],[/במבה|בוטנים/i,'🥜'],[/ביסלי|חטיף|snack/i,'🍿'],[/מרק/i,'🍲'],[/גלידה|ארטיק/i,'🍦'],
+  [/טיל|רקט|missile/i,'🚀'],[/טנק|מרכבה|נגמ.ש/i,'🪖'],[/פצצ|פצמ|נפץ|bomb|boom/i,'💣'],[/דרון|drone/i,'🛸'],
+  [/חרא|קקי|קקה|poo|poop|dung|terd|חירבון|חרבן|מחרבן|דרעק/i,'💩'],[/פליץ|פלוץ|פלוצ|fart|נאד|גזים|גז /i,'💨'],[/אסלה|שירותים|toilet|נייר טואלט|גליל/i,'🚽'],
+  [/זין|דיק|dick|בולבול|cock|זרג|ציקלופ|גרזן/i,'🍆'],[/תחת|butt|ass\b|ישבן|עכוז|באט|booty/i,'🍑'],[/ציצ|boob|tits|(?<![\u0590-\u05FF])(?:חזה)(?![\u0590-\u05FF])/i,'🍒'],[/פורנו|porn|סקס|sex|אורגי/i,'🔞'],
+  [/gpt|בינה|\bai\b|רובוט|robot|droid/i,'🤖'],[/מחשב|קוד|script|python|vpn|שרת|סרבר|כרום/i,'💻'],[/משחק|גיימ|gam|playstation|קליי סטיישן|8bit/i,'🎮'],[/סלוטו|slot|קזינו|הימור|בינגו|bingo|לוטו/i,'🎰'],
+  [/(?<![֐-׿])(?:רב|הרב|רבי)(?![֐-׿])|rabbi|חרד|דוס|תורה|תפיל|ישיב/i,'📜'],[/פסח|מצה|חרוסת|כרפס/i,'🫓'],[/פורים|אסתר/i,'🎭'],[/מסגד|אללה|allah|שיח/i,'🕌'],
+  [/נוצר|ישו|סנטה|claus|קריסמס|christmas|elf/i,'🎄'],[/רוס|בלרוס|וודקה|slav|russia|מטריוש/i,'🪆'],[/יפני|יפן|סמוראי/i,'🗾'],[/צרפת|פריז|french|eifel/i,'🗼'],
+  [/איטלק|אטלק|italian/i,'🇮🇹'],[/יוונ|זאוס|greek|פוסידון/i,'🏛️'],[/הודו|הודי|ינדיה/i,'🛕'],[/אמריק|ארה.ב|usa|america/i,'🗽'],[/נורד|ויקינג|viking|נורווג/i,'⚔️'],
+  [/בית ?ח'?א?י?יר|ביתח'?א?י?יר|חאייר|בית חייר/i,'🏜️'],[/(?<![\u0590-\u05FF])(?:ים|הים)(?![\u0590-\u05FF])|שיט|ספינ|קברניט|פיראט|צולל|רב חובל|ships?|sinking/i,'🚢'],[/מטוס|טיס|טייס|טיסה|תעופה|skyscan/i,'✈️'],
+  [/אוטו|רכב|מונית|נהג|מוסך|car\b|bmw|סוזוקי|פקק|כביש|ראלי/i,'🚗'],[/כדורגל|יונייטד|ליגה|מגרש|football/i,'⚽'],[/להקה|זמר|(?<![\u0590-\u05FF])(?:שיר|שירים)(?![\u0590-\u05FF])|rock|מוזיק|אופרה|קריוקי|תזמורת|גיטר|חצוצר|חליל|סקסופון|כלי נשיפה/i,'🎸'],
+  [/שיער|קרחת|קירח|גילוח|גלח|תסרוקת|מספרה|שעיר|hair/i,'💇'],[/שיניים|שן |דנטל|עששת/i,'🦷'],[/רופא|ניתוח|אחות|פרמדיק|אמבולנס|קרדיו|דיפיבריל/i,'🩺'],
+  [/כסף|מס |מסים|מיסוי|בנק|cash|money|revenue|רווח|משכנתא|כספומט|שקל/i,'💸'],[/גשם|סערה|ציקלון|טורנדו|monsoon/i,'🌧️'],[/שלג|(?<![\u0590-\u05FF])(?:קור|הקור)(?![\u0590-\u05FF])|קרח|סקי|אסקימו/i,'❄️'],[/(?<![\u0590-\u05FF])(?:אש|האש)(?![\u0590-\u05FF])|שריפ|מדורה|flame|fire/i,'🔥'],
+  [/חתונה|כלולות|זוגיות|דייט|date|טינדר|tinder/i,'💘'],[/תינוק|חיתול|baby|טיטול|מוצצ/i,'🍼'],[/חלל|כוכב|גלקסי|galaxy|star/i,'🪐'],[/סבתא|סבא/i,'👵'],
+  [/משטרה|בלש|שריף|שרלוק|חוקר/i,'🕵️'],[/כלא|אסיר|prison/i,'⛓️'],[/יוגה|מדיטציה|ויפאסנה/i,'🧘'],[/כושר|שריר|אימון|ספורט|פילאטיס|מתאגרף|אגרוף/i,'🏋️'],
+  [/קוסם|כישוף|מכשפ|הארי פוטר|potter|קסם|wizard/i,'🪄'],[/מעצב|עיצוב|design|ux|ui\b|פוטושופ|photoshop|אדובי|figma|מוקאפ/i,'🎨'],[/פיצ.ר|feature|מנהל מוצר|מנהלת מוצר|monday|מנדיי|jira|slack|סלאק|miro|מירו|weekly|daily|kpi|poc/i,'📋'],
+  [/שינה|ישן|נרדם|נחיר|snooze|nap|שנ"צ|שנ.צ/i,'😴'],[/נקיון|ניקיון|מנקה|שוטף|כביסה|מכבסה|סבון|ניקיטה/i,'🧽'],[/נשק|רובה|יורה|קלע|shooter/i,'🎯'],[/מלך|מלכ|נסיכ|ארמון|palace|royal/i,'👑'],
+  [/שעון|time|זמן/i,'⏰'],[/(?<![\u0590-\u05FF])(?:ספר|ספרים)(?![\u0590-\u05FF])|book/i,'📚'],[/טלפון|phone|מכשיר קשר/i,'📱'],[/מברג|בורג|ברגים|דיבל|פטיש|נגר|ACE/i,'🔧']
+];
+const FUN = ['😂','🤣','😜','🙃','🤪','😏','🫠','🤡','😎','🥴'];
+function emojisFor(text, topic, id){
+  const out = [];
+  for (const [re, e] of EMO) { if (re.test(text) && !out.includes(e)) { out.push(e); if (out.length === 2) break; } }
+  if (!out.length) out.push(topic === 'misc' ? FUN[hash(id) % FUN.length] : TOPIC_BY_ID[topic].emoji);
+  if (out.length === 1) out.push(topic === 'misc' || TOPIC_BY_ID[topic].emoji === out[0] ? FUN[hash(id + 'x') % FUN.length] : TOPIC_BY_ID[topic].emoji);
+  return out;
+}
+
+/* jokes posted as setup → punchline: the explanation is the pun, so it gets the big type */
+const FLIP = new Set('20220606-203428 20230511-194128 20240614-184812 20240707-122242 20240820-143741 20240820-144328 20240826-061500 20240920-111548 20240922-161103 20240922-170457 20240929-164811 20241001-040652 20241003-094445 20241010-092706 20241010-153013 20241020-163402 20241021-170812 20241105-101529 20241205-113046 20241205-125953 20241205-160443 20241208-104909 20241208-111126 20241208-120530 20241210-161744 20241211-181803 20241212-112148 20241212-113251 20241215-101632 20241215-143956 20241216-170552 20241218-113443 20241218-163804 20241221-180714 20241225-135606 20241225-135654 20241225-135714 20241225-140154 20241225-152612 20250102-115940 20250107-164041 20250114-151717 20250115-164355 20250127-112517 20250127-132653 20250127-205212 20250203-173635 20250205-102527 20250303-094532 20250305-130433 20250312-190253 20250324-103252 20250328-165521 20250331-131941 20250331-202500 20250403-213027 20250404-202706 20250411-011230 20250423-181542 20250423-181607 20250423-181954 20250423-183021 20250424-134743 20250428-150222 20250429-072057 20250429-163451 20250503-101856 20250504-123832 20250504-152312 20250504-175320 20250504-175321 20250504-175322 20250504-175323 20250504-184501 20250508-192052 20250508-192053 20250508-192054 20250508-192055 20250508-193120 20250508-193533 20250528-212423 20250610-092524 20250614-223707 20250614-224129 20250614-224343 20250616-205205 20250622-155840 20250718-213650'.split(' '));
+
+/* emoji picked by hand for every joke (first = what the pun is about); new jokes fall back to the keyword rules */
+const PICKED = (() => { try { return JSON.parse(document.getElementById('emoji').textContent); } catch { return {}; } })();
+const seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter('en', {granularity:'grapheme'}) : null;
+const splitEmoji = s => seg ? [...seg.segment(s)].map(x => x.segment) : [...s];
+
+/* ---------- data ---------- */
+const J = RAW.map(r => {
+  const t = r[5], e = r[6] || '', tp = topicOf(t + ' ' + e);
+  const flip = FLIP.has(r[0]) && !!e;
+  return {id:r[0], date:r[1], time:r[2], a:r[3], laughs:r[4], t, e, big:flip ? e : t, small:flip ? t : e, y:r[1].slice(0,4), topic:tp,
+    pal:PALS[hash(r[0]) % PALS.length], emo:PICKED[r[0]] ? splitEmoji(PICKED[r[0]]) : emojisFor(t + ' ' + e, tp, r[0]), hay:(t + ' ' + e).toLowerCase()};
+});
+const byId = new Map(J.map(j => [j.id, j]));
+
+const $ = s => document.querySelector(s);
+const el = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; };
+const store = {
+  get(k, d){ try { const v = localStorage.getItem('hp2:'+k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v){ try { localStorage.setItem('hp2:'+k, JSON.stringify(v)); } catch {} }
+};
+const d8 = s => new Date(s + 'T12:00:00');
+const fmtLong = new Intl.DateTimeFormat('en-US', {month:'long', day:'numeric', year:'numeric'});
+const fmtShort = new Intl.DateTimeFormat('en-US', {month:'short', day:'numeric', year:'numeric'});
+const fmtN = new Intl.NumberFormat('en-US');
+function ago(date){
+  const days = Math.floor((Date.now() - d8(date)) / 864e5);
+  if (days < 1) return 'today';
+  if (days < 7) return days + 'd';
+  if (days < 35) return Math.floor(days / 7) + 'w';
+  return fmtShort.format(d8(date));
+}
+const shuffle = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [a[i], a[k]] = [a[k], a[i]]; } return a; };
+function toast(msg){ document.querySelectorAll('.toast').forEach(n => n.remove()); const t = el('div', 'toast', msg); t.setAttribute('role', 'status'); document.body.append(t); setTimeout(() => t.remove(), 2600); }
+
+/* ---------- icons ---------- */
+const P = {
+  heart:'<path d="M12 20.5s-7.5-4.6-9.3-9.3C1.4 7.8 3.6 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.4 0 5.6 3.3 4.3 6.7-1.8 4.7-9.3 9.3-9.3 9.3z"/>',
+  send:'<path d="M21.5 3 10.2 13.8"/><path d="M21.5 3 15 21l-4.8-7.2L3 9.1z"/>',
+  home:'<path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1H15v-6.5H9V21H4.5a1 1 0 0 1-1-1z"/>',
+  homeOn:'<path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1H15v-6.5H9V21H4.5a1 1 0 0 1-1-1z"/>',
+  search:'<circle cx="10.5" cy="10.5" r="7"/><path d="m16 16 5 5"/>',
+  close:'<path d="M6 6l12 12M18 6 6 18"/>',
+  back:'<path d="M15 5 8 12l7 7"/>',
+  shuffle:'<path d="M3 7h3.5c2 0 3.2 1 4.3 2.7l2.4 4.6c1.1 1.7 2.3 2.7 4.3 2.7H21"/><path d="M3 17h3.5c1.4 0 2.4-.5 3.2-1.4M14.3 8.4c.8-.9 1.8-1.4 3.2-1.4H21"/><path d="m18 4 3 3-3 3M18 14l3 3-3 3"/>',
+  grid:'<rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><path d="M9.2 3.5v17M14.8 3.5v17M3.5 9.2h17M3.5 14.8h17"/>',
+  list:'<path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r=".8"/><circle cx="4" cy="12" r=".8"/><circle cx="4" cy="18" r=".8"/>',
+  share:'<path d="M12 15V3.5M7.5 8 12 3.5 16.5 8"/><path d="M5 12.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-6.5"/>',
+  save:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4.5 19.5h15"/>',
+  filter:'<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/>',
+  copy:'<rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5a1.5 1.5 0 0 0-1.5-1.5H5A1.5 1.5 0 0 0 3.5 5v9A1.5 1.5 0 0 0 5 15.5h3.5"/>'
+};
+const svg = (name, cls) => `<svg class="ico${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" aria-hidden="true">${P[name]}</svg>`;
+
+/* ---------- emoji pattern tiles (shared by DOM and canvas) ---------- */
+const tiles = {};
+function tileFor(e){
+  const key = e.join('');
+  if (tiles[key]) return tiles[key];
+  const c = document.createElement('canvas'), n = 240;
+  c.width = c.height = n;
+  const x = c.getContext('2d');
+  x.globalAlpha = .22; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = '64px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  x.fillText(e[0], n * .25, n * .27);
+  x.fillText(e[1], n * .75, n * .77);
+  const url = c.toDataURL('image/png');
+  return (tiles[key] = {canvas:c, url});
+}
+
+/* ---------- joke art ---------- */
+function sizes(j){
+  const L = [...j.big].length;
+  const longest = Math.max(...j.big.split(/\s+/).map(s => [...s].length));
+  const fs = Math.min(L <= 7 ? 17 : L <= 12 ? 13.5 : L <= 18 ? 11.2 : L <= 26 ? 9.4 : L <= 38 ? 8 : L <= 56 ? 6.8 : 5.6, 80 / (0.62 * longest));
+  const E = [...j.small].length;
+  const es = E <= 40 ? 4.8 : E <= 80 ? 4.2 : 3.6;
+  return {fs, es};
+}
+function art(j, opts = {}){
+  const a = el('div', 'art');
+  const [g1, g2, fg] = opts.pal || j.pal;
+  a.style.setProperty('--g', `linear-gradient(150deg, ${g1}, ${g2})`);
+  a.style.setProperty('--fg', fg);
+  const pat = el('div', 'pat'); pat.setAttribute('aria-hidden', 'true');
+  pat.style.setProperty('--pat', `url(${tileFor(j.emo).url})`);
+  a.append(pat);
+  const {fs, es} = sizes(j);
+  const box = el('div', 'txt');
+  const p = el('p', 'pun', j.big); p.dir = 'auto'; p.style.setProperty('--fs', (opts.story ? fs * 1.08 : fs) + 'cqw'); box.append(p);
+  if (j.small) { const e = el('p', 'ex', j.small.replace(/\s*\|\|\s*/g, '\n')); e.dir = 'auto'; e.style.setProperty('--es', (opts.story ? es * 1.15 : es) + 'cqw'); box.append(e); }
+  a.append(box);
+  a.setAttribute('role', 'img');
+  a.setAttribute('aria-label', j.big + (j.small ? ' — ' + j.small : ''));
+  return a;
+}
+
+/* ---------- likes (shared, via db; same docs as before) ---------- */
+const R = { db:null, uid:null, can:false, mine:{}, totals:{}, ready:false, queue:Promise.resolve() };
+const rCount = id => R.totals[id] || 0;
+function paintLikes(){
+  document.querySelectorAll('[data-like]').forEach(b => {
+    const on = !!R.mine[b.dataset.like];
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.setAttribute('aria-label', on ? 'Unlike' : 'Like');
+  });
+  document.querySelectorAll('[data-likes]').forEach(n => {
+    const c = rCount(n.dataset.likes);
+    n.classList.toggle('zero', !c);
+    n.textContent = c ? fmtN.format(c) + (c === 1 ? ' like' : ' likes') : (n.dataset.short ? '' : 'Be the first to like this');
+  });
+}
+function setLike(id, on){
+  if (!R.ready) { toast('Likes aren’t connected here yet.'); return false; }
+  if (!R.can) { toast('You can look around, but liking needs access to this page.'); return false; }
+  if (!!R.mine[id] === on) return true;
+  if (on) { R.mine[id] = 1; R.totals[id] = rCount(id) + 1; }
+  else { delete R.mine[id]; R.totals[id] = Math.max(0, rCount(id) - 1); }
+  paintLikes(); likedDirty = true;
+  const body = {r:{...R.mine}};
+  R.queue = R.queue.then(() => R.db.doc('reactions/' + R.uid).set(body)).catch(err => {
+    if (err && err.code === 'invalid_argument') { R.can = false; paintLikes(); }
+  });
+  return true;
+}
+function likeBtn(j){
+  const b = el('button', 'act like'); b.type = 'button'; b.dataset.like = j.id;
+  b.innerHTML = svg('heart');
+  b.addEventListener('click', e => {
+    e.stopPropagation();
+    if (setLike(j.id, !R.mine[j.id]) && R.mine[j.id]) { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
+  });
+  return b;
+}
+/* Likes backend: Claude's shared db when opened as a Claude artifact, Firebase when hosted on its own (GitHub Pages).
+   Both store the same shape: reactions/{uid} = {r:{jokeId:1}}. */
+const FIREBASE = (() => { try { return JSON.parse(document.getElementById('firebase-config').textContent); } catch { return {}; } })();
+async function claudeBackend(){
+  if (!window.claude || !window.claude.use) return null;
+  const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
+  if (!db || !user) return null;
+  const uid = await user.id();
+  if (!uid) return null;
+  let wr = null; try { wr = user.can ? await user.can('data.write') : null; } catch {}
+  return {uid, can:wr !== false,
+    save:body => db.doc('reactions/' + uid).set(body),
+    watch:fn => db.collection('reactions').onSnapshot(snap => fn(snap.docs.map(d => ({id:d.id, data:d.data() || {}, pending:d.metadata.hasPendingWrites}))), () => {})};
+}
+async function firebaseBackend(){
+  if (!FIREBASE.apiKey) return null;
+  const base = 'https://www.gstatic.com/firebasejs/10.12.2/';
+  const [{initializeApp}, {getAuth, signInAnonymously}, fs] = await Promise.all([
+    import(base + 'firebase-app.js'), import(base + 'firebase-auth.js'), import(base + 'firebase-firestore.js')]);
+  const app = initializeApp(FIREBASE);
+  const cred = await signInAnonymously(getAuth(app));   // a silent per-device id, no account needed
+  const uid = cred.user.uid, db = fs.getFirestore(app);
+  return {uid, can:true,
+    save:body => fs.setDoc(fs.doc(db, 'reactions', uid), body),
+    watch:fn => fs.onSnapshot(fs.collection(db, 'reactions'),
+      snap => fn(snap.docs.map(d => ({id:d.id, data:d.data() || {}, pending:d.metadata.hasPendingWrites}))), () => {})};
+}
+(async () => {
+  try {
+    const be = (await claudeBackend().catch(() => null)) || (await firebaseBackend().catch(() => null));
+    if (!be) return;
+    R.db = {doc:() => ({set:be.save})}; R.uid = be.uid; R.can = be.can; R.ready = true;
+    be.watch(docs => {
+      const totals = {};
+      docs.forEach(doc => {
+        const r = doc.data.r || {};
+        for (const k in r) totals[k] = (totals[k] || 0) + 1;
+        if (doc.id === R.uid && !doc.pending) R.mine = {...r};
+      });
+      R.totals = totals; likedDirty = true;
+      paintLikes();
+      if (S.tab === 'liked') renderLiked();
+      if (S.tab === 'archive' && A.sort === 'loved') renderArchiveList();
+    });
+    paintLikes();
+  } catch {}
+})();
+
+/* ---------- post ---------- */
+function avatar(a){
+  const v = el('span', 'av au-' + a); v.setAttribute('aria-hidden', 'true');
+  if (AUTH[a].photo) { const im = el('img'); im.src = AUTH[a].photo; im.alt = ''; im.decoding = 'async'; v.append(im); }
+  else v.textContent = AUTH[a].ini;
+  return v;
+}
+function post(j, i){
+  const p = el('article', 'post au-' + j.a + (i != null && i < 3 ? ' rise' : ''));
+  if (i != null && i < 3) p.style.animationDelay = (i * 80) + 'ms';
+  const h = el('header', 'phead');
+  h.append(avatar(j.a));
+  const who = el('button', 'who linkish', AUTH[j.a].name); who.type = 'button';
+  who.addEventListener('click', () => openArchive({author:j.a}));
+  h.append(who, el('span', 'sp'));
+  p.append(h);
+  const a = art(j);
+  const burst = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  burst.setAttribute('viewBox', '0 0 24 24'); burst.classList.add('burst'); burst.innerHTML = P.heart; burst.setAttribute('aria-hidden', 'true');
+  a.append(burst);
+  let last = 0;
+  a.addEventListener('click', () => {
+    const now = Date.now();
+    if (now - last < 320) {
+      last = 0;
+      if (setLike(j.id, true)) { burst.classList.remove('go'); void burst.getBoundingClientRect(); burst.classList.add('go'); }
+    } else last = now;
+  });
+  p.append(a);
+  const acts = el('div', 'acts');
+  const sh = el('button', 'act'); sh.type = 'button'; sh.innerHTML = svg('send'); sh.setAttribute('aria-label', 'Share');
+  sh.addEventListener('click', () => openShare(j));
+  acts.append(likeBtn(j), sh);
+  p.append(acts);
+  const body = el('div', 'pbody');
+  const likes = el('div', 'likes'); likes.dataset.likes = j.id; body.append(likes);
+  const cap = el('div', 'cap');
+  const cw = el('button', 'linkish', AUTH[j.a].name); cw.type = 'button'; cw.addEventListener('click', () => openArchive({author:j.a}));
+  const t = TOPIC_BY_ID[j.topic];
+  const tag = el('button', 'tag', '#' + t.name.toLowerCase().replace(/[^a-z]+/g, '')); tag.type = 'button';
+  tag.addEventListener('click', () => openArchive({topic:j.topic}));
+  cap.append(cw, ' ', tag);
+  body.append(cap, el('time', 'date', fmtLong.format(d8(j.date))));
+  body.lastChild.dateTime = j.date;
+  p.append(body);
+  return p;
+}
+
+function paged(host, list, draw, size, endNode){
+  let i = 0, io = null;
+  const sentinel = el('div', 'more');
+  const step = () => {
+    const end = Math.min(list.length, i + size);
+    const frag = document.createDocumentFragment();
+    for (; i < end; i++) frag.append(draw(list[i], i));
+    host.append(frag); paintLikes();
+    if (i >= list.length) { sentinel.remove(); io && io.disconnect(); if (endNode) host.after(endNode); }
+    else host.after(sentinel);
+  };
+  step();
+  if (i < list.length) { io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) step(); }, {rootMargin:'1200px'}); io.observe(sentinel); }
+  return () => io && io.disconnect();
+}
+
+/* ---------- state + nav ---------- */
+const TABS = [
+  {id:'home', label:'Home', off:svg('home', 'off'), on:svg('homeOn', 'on')},
+  {id:'archive', label:'Archive', off:svg('search', 'off'), on:svg('search', 'on stroke')},
+  {id:'liked', label:'Liked', off:svg('heart', 'off'), on:svg('heart', 'on')}
+];
+const S = { tab:'home', scroll:{home:0, archive:0, liked:0} };
+let likedDirty = true;
+
+/* floating tab bar, after Instagram's: a frosted capsule whose highlight slides (and can be scrubbed) between tabs,
+   grows a little while pressed and tucks itself smaller while you scroll down */
+const NAV = { pill:null, drag:null };
+function placePill(i, live){
+  NAV.pill.style.transition = live ? 'none' : '';
+  NAV.pill.style.transform = `translateX(${i * 100}%)`;
+}
+function buildNav(){
+  const nav = $('#nav');
+  NAV.pill = el('span', 'pill'); NAV.pill.setAttribute('aria-hidden', 'true'); nav.append(NAV.pill);
+  TABS.forEach(t => {
+    const b = el('button', 'tab'); b.type = 'button'; b.setAttribute('role', 'tab'); b.dataset.tab = t.id;
+    b.setAttribute('aria-label', t.label); b.title = t.label;
+    b.innerHTML = t.off + t.on;
+    b.addEventListener('click', e => {
+      if (NAV.dragged) { NAV.dragged = false; return; }
+      if (S.tab !== t.id) go(t.id);
+      else if (window.scrollY > 4) window.scrollTo({top:0, behavior:'smooth'});
+      else if (t.id === 'home') refreshHome();
+    });
+    nav.append(b);
+  });
+  const slot = x => { const r = nav.getBoundingClientRect(); return Math.max(0, Math.min(TABS.length - 1, (x - r.left - 6) / ((r.width - 12) / TABS.length))); };
+  nav.addEventListener('pointerdown', e => {
+    nav.classList.add('press'); nav.classList.remove('compact');
+    NAV.drag = {x0:e.clientX, moved:false};
+  });
+  nav.addEventListener('pointermove', e => {
+    if (!NAV.drag) return;
+    if (!NAV.drag.moved && Math.abs(e.clientX - NAV.drag.x0) < 12) return;
+    if (!NAV.drag.moved) { NAV.drag.moved = true; try { nav.setPointerCapture(e.pointerId); } catch {} }
+    placePill(slot(e.clientX) - .5 < 0 ? 0 : Math.min(TABS.length - 1, slot(e.clientX) - .5), true);
+  });
+  const end = e => {
+    nav.classList.remove('press');
+    if (!NAV.drag) return;
+    const moved = NAV.drag.moved; NAV.drag = null;
+    if (!moved) return;
+    NAV.dragged = true; setTimeout(() => { NAV.dragged = false; }, 50);
+    const i = Math.floor(slot(e.clientX));
+    placePill(i);
+    if (TABS[i].id !== S.tab) go(TABS[i].id); else placePill(i);
+  };
+  nav.addEventListener('pointerup', end);
+  nav.addEventListener('pointercancel', e => { nav.classList.remove('press'); NAV.drag = null; placePill(TABS.findIndex(t => t.id === S.tab)); });
+  let lastY = window.scrollY;
+  addEventListener('scroll', () => {
+    const y = window.scrollY, dy = y - lastY; lastY = y;
+    if (document.body.classList.contains('lock')) return;
+    if (dy > 6 && y > 120) nav.classList.add('compact');
+    else if (dy < -6 || y < 60) nav.classList.remove('compact');
+  }, {passive:true});
+}
+function topbar(){
+  const bar = $('#topbar'); bar.innerHTML = '';
+  // Home and Archive have no header; Liked keeps its title
+  document.querySelector('header.top').hidden = S.tab !== 'liked';
+  if (S.tab === 'liked') bar.append(el('h1', 'pagetitle', 'Liked'));
+}
+function go(tab, keepScroll){
+  if (!TABS.some(t => t.id === tab)) tab = 'home';
+  S.scroll[S.tab] = window.scrollY;
+  S.tab = tab;
+  TABS.forEach(t => { $('#v-' + t.id).hidden = t.id !== tab; });
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false'));
+  placePill(TABS.findIndex(t => t.id === tab), !NAV.placed); NAV.placed = true;
+  $('#nav').classList.remove('compact');
+  topbar();
+  if (tab === 'archive' && !A.built) buildArchive();
+  if (tab === 'liked' && likedDirty) renderLiked();
+  try { history.replaceState(null, '', '#' + tab); } catch {}
+  window.scrollTo({top: keepScroll ? window.scrollY : S.scroll[tab] || 0});
+  paintLikes();
+}
+
+/* swipe between tabs (touch only, not from horizontal scrollers or overlays) */
+(() => {
+  let x0 = null, y0 = 0, t0 = 0;
+  document.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1 || e.target.closest('.tray,.chips,.sv,.fs-bg,.single,.nav,.active,input,select')) { x0 = null; return; }
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
+  }, {passive:true});
+  document.addEventListener('touchend', e => {
+    if (x0 == null) return;
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - t0 > 600) return;
+    const i = TABS.findIndex(t => t.id === S.tab), n = i + (dx < 0 ? 1 : -1);
+    if (TABS[n]) go(TABS[n].id);
+  }, {passive:true});
+})();
+
+/* ---------- home: stories + shuffled feed ---------- */
+let stopFeed = null, storySet = [];
+function buildHome(){
+  const v = $('#v-home'); v.innerHTML = '';
+  if (stopFeed) stopFeed();
+  // stories: every topic with enough jokes, random order, 6 random jokes each
+  const groups = {};
+  J.forEach(j => { (groups[j.topic] = groups[j.topic] || []).push(j); });
+  const seen = store.get('seen', {});
+  // every story and every slide inside it gets its own colour
+  const start = Math.floor(Math.random() * PALS.length);
+  storySet = shuffle(TOPICS.filter(t => (groups[t.id] || []).length >= 4)).map((t, k) => ({topic:t, jokes:shuffle(groups[t.id]).slice(0, 6), pal:PALS[(start + k * 7) % PALS.length]}));
+  const ptr = el('div', 'ptr'); ptr.innerHTML = '<span class="spin" aria-hidden="true"></span>'; ptr.setAttribute('aria-hidden', 'true');
+  v.append(ptr);
+  const tray = el('div', 'tray'); tray.setAttribute('aria-label', 'Stories');
+  storySet.forEach((s, i) => {
+    const b = el('button', 'story' + (seen[s.topic.id] && seen[s.topic.id] > Date.now() - 864e5 ? ' seen' : '')); b.type = 'button';
+    const ring = el('span', 'ring'), bub = el('span', 'bubble', s.topic.emoji);
+    bub.style.setProperty('--sbg', `linear-gradient(150deg, ${s.pal[0]}, ${s.pal[1]})`);
+    ring.append(bub); b.append(ring, el('span', 'lbl', s.topic.name));
+    b.setAttribute('aria-label', 'Story: ' + s.topic.name);
+    b.addEventListener('click', () => openStory(i));
+    tray.append(b);
+  });
+  v.append(tray);
+  const feed = el('div', 'feed');
+  v.append(feed);
+  const end = el('div', 'end');
+  end.append(el('p', null, "You're all caught up."));
+  const again = el('button', null, 'Shuffle again'); again.type = 'button';
+  again.addEventListener('click', () => { window.scrollTo({top:0}); refreshHome(); });
+  end.append(again);
+  stopFeed = paged(feed, shuffle(J), post, 8, end);
+}
+function refreshHome(){
+  const ptr = $('#v-home .ptr');
+  if (ptr) { ptr.style.transition = ''; ptr.style.height = '64px'; ptr.classList.add('busy'); }
+  setTimeout(() => { buildHome(); }, 650);
+}
+
+/* pull to refresh: drag down from the top of Home, release past the line */
+(() => {
+  let y0 = null, pull = 0;
+  const ptr = () => $('#v-home .ptr');
+  document.addEventListener('touchstart', e => {
+    if (S.tab !== 'home' || window.scrollY > 0 || e.touches.length !== 1 || document.body.classList.contains('lock') || e.target.closest('.nav')) { y0 = null; return; }
+    y0 = e.touches[0].clientY; pull = 0;
+  }, {passive:true});
+  document.addEventListener('touchmove', e => {
+    if (y0 == null) return;
+    const dy = e.touches[0].clientY - y0;
+    if (dy <= 0 || window.scrollY > 0) { pull = 0; const p = ptr(); if (p && !p.classList.contains('busy')) p.style.height = '0px'; return; }
+    pull = Math.min(110, dy * .5);
+    const p = ptr(); if (!p) return;
+    p.style.transition = 'none'; p.style.height = pull + 'px';
+    p.style.setProperty('--turn', (pull / 64 * 300) + 'deg');
+    p.classList.toggle('armed', pull >= 64);
+    if (e.cancelable && dy > 8) e.preventDefault();
+  }, {passive:false});
+  document.addEventListener('touchend', () => {
+    if (y0 == null) return; y0 = null;
+    const p = ptr(); if (!p) return;
+    p.style.transition = '';
+    if (pull >= 64) refreshHome(); else p.style.height = '0px';
+    pull = 0;
+  }, {passive:true});
+})();
+
+/* ---------- story viewer ---------- */
+let SV = null;
+function openStory(si, ji = 0){
+  closeStory(true);
+  const s = storySet[si]; if (!s) return;
+  const seen = store.get('seen', {}); seen[s.topic.id] = Date.now(); store.set('seen', seen);
+  document.querySelectorAll('.story')[si]?.classList.add('seen');
+  const root = el('div', 'sv'); root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', s.topic.name + ' story');
+  const frame = el('div', 'frame');
+  root.append(frame); document.body.append(root); document.body.classList.add('lock');
+  SV = {root, frame, si, ji, t0:0, dur:5000, el:0, paused:false, raf:0, prevFocus:document.activeElement};
+  const keys = e => {
+    if (!SV) return;
+    if (e.key === 'Escape') closeStory();
+    else if (e.key === 'ArrowRight') step(1);
+    else if (e.key === 'ArrowLeft') step(-1);
+    else if (e.key === ' ') { e.preventDefault(); SV.paused = !SV.paused; }
+  };
+  document.addEventListener('keydown', keys); SV.keys = keys;
+  // tap left/right, hold to pause, swipe down to close
+  let down = null;
+  frame.addEventListener('pointerdown', e => {
+    if (e.target.closest('button')) return;
+    down = {x:e.clientX, y:e.clientY, t:Date.now()}; SV.paused = true; frame.classList.add('paused');
+  });
+  const up = e => {
+    if (!down || !SV) return;
+    const dy = e.clientY - down.y, dt = Date.now() - down.t, x = e.clientX - frame.getBoundingClientRect().left;
+    down = null; SV.paused = false; frame.classList.remove('paused');
+    if (dy > 90) { closeStory(); return; }
+    if (dt < 250) step(x < frame.clientWidth * .33 ? -1 : 1);
+  };
+  frame.addEventListener('pointerup', up);
+  frame.addEventListener('pointercancel', () => { down = null; if (SV) { SV.paused = false; frame.classList.remove('paused'); } });
+  showFrame();
+  const tick = now => {
+    if (!SV) return;
+    if (!SV.last) SV.last = now;
+    const dt = now - SV.last; SV.last = now;
+    if (!SV.paused && !document.hidden) SV.el += dt;
+    const bar = SV.frame.querySelectorAll('.bars b')[SV.ji];
+    if (bar) bar.style.transform = `scaleX(${Math.min(1, SV.el / SV.dur)})`;
+    if (SV.el >= SV.dur) step(1);
+    if (SV) SV.raf = requestAnimationFrame(tick);
+  };
+  SV.raf = requestAnimationFrame(tick);
+  root.querySelector('.close')?.focus();
+}
+function showFrame(){
+  const s = storySet[SV.si], j = s.jokes[SV.ji], f = SV.frame;
+  f.innerHTML = '';
+  const a = art(j, {story:true, pal:PALS[(PALS.indexOf(s.pal) + SV.ji * 5) % PALS.length]}); a.classList.add('slide'); f.append(a);
+  const bars = el('div', 'bars');
+  s.jokes.forEach((_, k) => { const i = el('i', k < SV.ji ? 'done' : ''); i.append(el('b')); bars.append(i); });
+  f.append(bars);
+  const hd = el('div', 'hd');
+  hd.append(el('span', 'bubble', s.topic.emoji), el('span', 'n', s.topic.name), el('span', 'w', AUTH[j.a].name), el('span', 'sp'));
+  const x = el('button', 'close'); x.type = 'button'; x.innerHTML = svg('close'); x.setAttribute('aria-label', 'Close story');
+  x.addEventListener('click', () => closeStory());
+  hd.append(x); f.append(hd);
+  const ft = el('div', 'ft');
+  const n = el('span', 'n'); n.dataset.likes = j.id; n.dataset.short = '1';
+  const sh = el('button', 'act'); sh.type = 'button'; sh.innerHTML = svg('send'); sh.setAttribute('aria-label', 'Share');
+  sh.addEventListener('click', () => openShare(j));
+  ft.append(n, likeBtn(j), sh); f.append(ft);
+  if (!store.get('storyHint', false)) { f.append(el('div', 'hint', 'Tap to go on · hold to pause · swipe down to close')); store.set('storyHint', true); }
+  SV.el = 0; SV.dur = 4500 + Math.min(4000, ([...j.t].length + [...j.e].length) * 45);
+  paintLikes();
+}
+function step(d){
+  if (!SV) return;
+  const s = storySet[SV.si];
+  const nj = SV.ji + d;
+  if (nj >= 0 && nj < s.jokes.length) { SV.ji = nj; showFrame(); return; }
+  const ns = SV.si + d;
+  if (ns >= 0 && ns < storySet.length) openStory(ns, d < 0 ? storySet[ns].jokes.length - 1 : 0);
+  else if (d > 0) closeStory();
+  else { SV.el = 0; }
+}
+function closeStory(quiet){
+  if (!SV) return;
+  cancelAnimationFrame(SV.raf);
+  document.removeEventListener('keydown', SV.keys);
+  SV.root.remove();
+  const pf = SV.prevFocus; SV = null;
+  if (!quiet) { document.body.classList.remove('lock'); pf && pf.focus && pf.focus(); }
+}
+
+/* ---------- share: render a PNG of the post ---------- */
+const isRtl = s => { const m = s.match(/[A-Za-z֐-׿]/); return !!m && /[֐-׿]/.test(m[0]); };
+function wrap(ctx, text, maxW){
+  const words = text.split(/\s+/), lines = []; let cur = '';
+  for (const wd of words) {
+    const t = cur ? cur + ' ' + wd : wd;
+    if (ctx.measureText(t).width <= maxW || !cur) cur = t; else { lines.push(cur); cur = wd; }
+  }
+  if (cur) lines.push(cur);
+  // break any single word that is still too wide
+  return lines.flatMap(l => { if (ctx.measureText(l).width <= maxW) return [l]; const out = []; let c = ''; for (const ch of [...l]) { if (ctx.measureText(c + ch).width > maxW && c) { out.push(c); c = ch; } else c += ch; } if (c) out.push(c); return out; });
+}
+async function renderPng(j){
+  const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  try { await Promise.all([document.fonts.load('800 80px Rubik', j.big), document.fonts.load('500 40px Rubik', j.small || 'a'), document.fonts.load('600 34px Rubik', 'Ab')]); } catch {}
+  const [g1, g2, fg] = j.pal;
+  const g = x.createLinearGradient(0, 0, W * .5, H); g.addColorStop(0, g1); g.addColorStop(1, g2);
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  x.save(); x.translate(W / 2, H / 2); x.rotate(-8 * Math.PI / 180); x.translate(-W * .6, -H * .6);
+  const pat = x.createPattern(tileFor(j.emo).canvas, 'repeat');
+  const m = new DOMMatrix().scale(1.53); pat.setTransform && pat.setTransform(m);
+  x.fillStyle = pat; x.globalAlpha = .9; x.fillRect(0, 0, W * 1.2, H * 1.2); x.restore();
+  x.fillStyle = fg; x.textAlign = 'center'; x.textBaseline = 'alphabetic';
+  const {fs, es} = sizes(j);
+  let size = fs * W / 100, esz = es * W / 100, maxW = W * .82;
+  let tl, el2, lh, elh, total;
+  for (let k = 0; k < 30; k++) {
+    x.font = `800 ${size}px Rubik, sans-serif`; x.direction = isRtl(j.big) ? 'rtl' : 'ltr'; tl = wrap(x, j.big, maxW); lh = size * 1.1;
+    x.font = `500 ${esz}px Rubik, sans-serif`; x.direction = isRtl(j.small) ? 'rtl' : 'ltr'; el2 = j.small ? wrap(x, j.small, maxW * .92) : []; elh = esz * 1.32;
+    total = tl.length * lh + (el2.length ? 44 + el2.length * elh : 0);
+    if (total <= H * .66) break;
+    size *= .93; esz *= .95;
+  }
+  let y = (H - 120 - total) / 2 + 60 + size * .85;
+  x.font = `800 ${size}px Rubik, sans-serif`; x.direction = isRtl(j.big) ? 'rtl' : 'ltr';
+  tl.forEach(l => { x.fillText(l, W / 2, y); y += lh; });
+  if (el2.length) {
+    y += 44 - lh + elh; x.font = `500 ${esz}px Rubik, sans-serif`; x.direction = isRtl(j.small) ? 'rtl' : 'ltr'; x.globalAlpha = .92;
+    el2.forEach(l => { x.fillText(l, W / 2, y); y += elh; }); x.globalAlpha = 1;
+  }
+  // footer: author photo, name and date
+  x.direction = 'ltr';
+  const cx = 92, cy = H - 92, r = 38;
+  x.save(); x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.closePath();
+  const img = await new Promise(res => { if (!AUTH[j.a].photo) return res(null); const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = AUTH[j.a].photo; });
+  if (img) { x.clip(); x.drawImage(img, cx - r, cy - r, r * 2, r * 2); }
+  else { x.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--' + j.a).trim() || '#333'; x.fill(); x.fillStyle = '#fff'; x.font = '600 32px Rubik, sans-serif'; x.textAlign = 'center'; x.fillText(AUTH[j.a].ini, cx, cy + 11); }
+  x.restore();
+  x.strokeStyle = fg; x.globalAlpha = .9; x.lineWidth = 4; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.stroke(); x.globalAlpha = 1;
+  x.fillStyle = fg; x.textAlign = 'left'; x.font = '600 34px Rubik, sans-serif'; x.fillText(AUTH[j.a].name, 146, H - 98);
+  x.globalAlpha = .8; x.font = '400 28px Rubik, sans-serif'; x.fillText(fmtLong.format(d8(j.date)), 146, H - 60); x.globalAlpha = 1;
+  return new Promise(res => c.toBlob(b => res({blob:b, url:c.toDataURL('image/png')}), 'image/png'));
+}
+const shareText = j => j.t + (j.e ? '\n' + j.e : '') + '\n— ' + AUTH[j.a].name;
+/* Share = copy the post as an image to the clipboard; fall back to saving it, then to copying the text */
+async function openShare(j, onDone){
+  const png = renderPng(j);
+  try {
+    if (!window.ClipboardItem || !navigator.clipboard || !navigator.clipboard.write) throw new Error('no clipboard');
+    await navigator.clipboard.write([new ClipboardItem({'image/png': png.then(r => r.blob)})]);
+    toast('Image copied — paste it anywhere');
+  } catch {
+    try {
+      const dl = await claude?.use?.('downloads');
+      if (!dl) throw new Error('no downloads');
+      await dl.save({filename:'hloptech-pun.png', data:(await png).blob});
+      toast('Copying images isn’t allowed here, so it was saved instead');
+    } catch (e) {
+      if (e && e.code === 'declined') { toast('Not saved'); }
+      else {
+        try { await navigator.clipboard.writeText(shareText(j)); toast('Copied the text instead'); }
+        catch { toast('Couldn’t copy here'); }
+      }
+    }
+  }
+  onDone && onDone();
+}
+
+/* ---------- archive ---------- */
+const A = { built:false, q:'', author:null, topic:null, year:'all', sort:'new', view:store.get('aview', 'grid'), stop:null };
+function openArchive(f){
+  A.author = f.author || null; A.topic = f.topic || null; A.q = '';
+  if (single) closeSingle();
+  A.year = 'all'; A.sort = 'new';
+  if (!A.built) { go('archive'); } else { syncArchiveControls(); go('archive'); renderArchiveList(); }
+  S.scroll.archive = 0; window.scrollTo({top:0});
+}
+function archiveList(){
+  const q = A.q.trim().toLowerCase();
+  let out = J.filter(j => (!A.author || j.a === A.author) && (!A.topic || j.topic === A.topic) && (A.year === 'all' || j.y === A.year) && (!q || j.hay.includes(q)));
+  const key = j => j.date + j.time.padStart(8, '0');
+  if (A.sort === 'new') out.sort((x, y) => key(y).localeCompare(key(x)));
+  else if (A.sort === 'old') out.sort((x, y) => key(x).localeCompare(key(y)));
+  else if (A.sort === 'group') out.sort((x, y) => y.laughs - x.laughs || key(y).localeCompare(key(x)));
+  else out.sort((x, y) => rCount(y.id) - rCount(x.id) || y.laughs - x.laughs);
+  return out;
+}
+const SORTS = [['new','Newest'],['old','Oldest'],['loved','Most liked'],['group','Group favorites']];
+const YEARS = [...new Set(J.map(j => j.y))].sort().reverse();
+const activeFilters = () => (A.author ? 1 : 0) + (A.topic ? 1 : 0) + (A.year !== 'all' ? 1 : 0) + (A.sort !== 'new' ? 1 : 0);
+function buildArchive(){
+  A.built = true;
+  const v = $('#v-archive'); v.innerHTML = '';
+  // one sticky row: search, filters (with a count badge), grid/list toggle
+  const tools = el('div', 'tools');
+  const bar = el('div', 'sbar');
+  const s = el('label', 'search'); s.innerHTML = svg('search');
+  const inp = el('input'); inp.type = 'search'; inp.placeholder = 'Search puns'; inp.setAttribute('aria-label', 'Search puns'); inp.autocomplete = 'off'; inp.id = 'aq';
+  let t; inp.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { A.q = inp.value; syncArchiveControls(); renderArchiveList(); }, 140); });
+  s.append(inp);
+  const fb = el('button', 'tbtn'); fb.type = 'button'; fb.id = 'afilter'; fb.innerHTML = svg('filter') + '<span class="badge" hidden></span>';
+  fb.setAttribute('aria-label', 'Filters'); fb.title = 'Filters';
+  fb.addEventListener('click', openFilters);
+  const vb = el('button', 'tbtn'); vb.type = 'button'; vb.id = 'aview';
+  vb.addEventListener('click', () => { A.view = A.view === 'grid' ? 'list' : 'grid'; store.set('aview', A.view); syncArchiveControls(); renderArchiveList(); });
+  bar.append(s, fb, vb); tools.append(bar);
+  const act = el('div', 'active'); act.id = 'aactive'; act.hidden = true; tools.append(act);
+  v.append(tools, el('div', null));
+  v.lastChild.id = 'alist';
+  // the row tucks away while scrolling down the results and returns on the way up
+  let lastY = window.scrollY;
+  addEventListener('scroll', () => {
+    const y = window.scrollY, dy = y - lastY; lastY = y;
+    if (S.tab !== 'archive' || document.body.classList.contains('lock')) return;
+    if (dy > 6 && y > 140 && document.activeElement !== inp) tools.classList.add('tuck');
+    else if (dy < -6 || y < 80) tools.classList.remove('tuck');
+  }, {passive:true});
+  syncArchiveControls(); renderArchiveList();
+}
+function syncArchiveControls(){
+  const inp = $('#aq'); if (inp && inp.value !== A.q) inp.value = A.q;
+  const n = activeFilters(), badge = document.querySelector('#afilter .badge');
+  if (badge) { badge.hidden = !n; badge.textContent = n; $('#afilter').classList.toggle('on', !!n); $('#afilter').setAttribute('aria-label', n ? `Filters, ${n} on` : 'Filters'); }
+  const vb = $('#aview');
+  if (vb) { const other = A.view === 'grid' ? 'list' : 'grid'; vb.innerHTML = svg(other); vb.setAttribute('aria-label', 'Show as ' + other); vb.title = other === 'grid' ? 'Grid' : 'List'; }
+  // removable chips, only for filters that are on
+  const act = $('#aactive'); if (!act) return;
+  act.innerHTML = '';
+  const chip = (label, clear, avatarOf) => {
+    const c = el('button', 'achip'); c.type = 'button';
+    if (avatarOf) c.append(avatar(avatarOf));
+    c.append(el('span', null, label)); c.insertAdjacentHTML('beforeend', svg('close'));
+    c.setAttribute('aria-label', 'Remove filter: ' + label);
+    c.addEventListener('click', () => { clear(); syncArchiveControls(); renderArchiveList(); });
+    act.append(c);
+  };
+  if (A.author) chip(AUTH[A.author].name, () => { A.author = null; }, A.author);
+  if (A.topic) { const tp = TOPIC_BY_ID[A.topic]; chip(tp.emoji + ' ' + tp.name, () => { A.topic = null; }); }
+  if (A.year !== 'all') chip(A.year, () => { A.year = 'all'; });
+  if (A.sort !== 'new') chip(SORTS.find(x => x[0] === A.sort)[1], () => { A.sort = 'new'; });
+  if (n) {
+    const clr = el('button', 'clear', 'Clear all'); clr.type = 'button';
+    clr.addEventListener('click', () => { A.author = A.topic = null; A.year = 'all'; A.sort = 'new'; syncArchiveControls(); renderArchiveList(); });
+    act.append(clr);
+  }
+  act.hidden = !n;
+}
+
+/* filter sheet: edits a draft, shows the live result count, applies on the button */
+function openFilters(){
+  const D = {author:A.author, topic:A.topic, year:A.year, sort:A.sort};
+  const bg = el('div', 'fs-bg'); const sh = el('div', 'fsheet');
+  sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); sh.setAttribute('aria-label', 'Filters');
+  bg.append(sh);
+  const head = el('div', 'fs-head');
+  const x = el('button', 'iconbtn'); x.type = 'button'; x.innerHTML = svg('close'); x.setAttribute('aria-label', 'Close');
+  const reset = el('button', 'fs-reset', 'Reset'); reset.type = 'button';
+  head.append(x, el('h2', null, 'Filters'), reset);
+  sh.append(el('div', 'grab'), head);
+  const body = el('div', 'fs-body'); sh.append(body);
+  const section = title => { const sec = el('section', 'fs-sec'); sec.append(el('h3', null, title)); body.append(sec); return sec; };
+  const people = el('div', 'fs-people'); section('People').append(people);
+  ['s','a','d'].forEach(k => {
+    const b = el('button', 'person au-' + k); b.type = 'button'; b.dataset.k = k;
+    b.append(avatar(k), el('span', null, AUTH[k].name));
+    b.addEventListener('click', () => { D.author = D.author === k ? null : k; paint(); });
+    people.append(b);
+  });
+  const topics = el('div', 'fs-wrap'); section('Topics').append(topics);
+  [...TOPICS, MISC].forEach(tp => {
+    const b = el('button', 'chip', tp.emoji + ' ' + tp.name); b.type = 'button'; b.dataset.k = tp.id;
+    b.addEventListener('click', () => { D.topic = D.topic === tp.id ? null : tp.id; paint(); });
+    topics.append(b);
+  });
+  const years = el('div', 'fs-wrap'); section('Year').append(years);
+  [['all','All'], ...YEARS.map(y => [y, y])].forEach(([k, l]) => {
+    const b = el('button', 'chip', l); b.type = 'button'; b.dataset.k = k;
+    b.addEventListener('click', () => { D.year = k; paint(); });
+    years.append(b);
+  });
+  const sorts = el('div', 'fs-wrap'); section('Sort by').append(sorts);
+  SORTS.forEach(([k, l]) => {
+    const b = el('button', 'chip', l); b.type = 'button'; b.dataset.k = k;
+    b.addEventListener('click', () => { D.sort = k; paint(); });
+    sorts.append(b);
+  });
+  const go2 = el('button', 'fs-go'); go2.type = 'button';
+  sh.append(go2);
+  function paint(){
+    people.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', D.author === b.dataset.k ? 'true' : 'false'));
+    topics.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', D.topic === b.dataset.k ? 'true' : 'false'));
+    years.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', D.year === b.dataset.k ? 'true' : 'false'));
+    sorts.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', D.sort === b.dataset.k ? 'true' : 'false'));
+    const q = A.q.trim().toLowerCase();
+    const n = J.filter(j => (!D.author || j.a === D.author) && (!D.topic || j.topic === D.topic) && (D.year === 'all' || j.y === D.year) && (!q || j.hay.includes(q))).length;
+    go2.textContent = n ? `Show ${fmtN.format(n)} ${n === 1 ? 'pun' : 'puns'}` : 'No puns match';
+    go2.disabled = !n;
+    reset.disabled = !D.author && !D.topic && D.year === 'all' && D.sort === 'new';
+  }
+  const pf = document.activeElement;
+  const close = () => { bg.classList.add('out'); setTimeout(() => bg.remove(), 200); document.removeEventListener('keydown', esc, true); document.body.classList.remove('lock'); pf && pf.focus && pf.focus(); };
+  const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  x.addEventListener('click', close);
+  bg.addEventListener('click', e => { if (e.target === bg) close(); });
+  reset.addEventListener('click', () => { D.author = D.topic = null; D.year = 'all'; D.sort = 'new'; paint(); });
+  go2.addEventListener('click', () => { Object.assign(A, D); close(); syncArchiveControls(); renderArchiveList(); window.scrollTo({top:0}); });
+  // drag the sheet down to dismiss
+  let y0 = null;
+  head.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; }, {passive:true});
+  head.addEventListener('touchmove', e => { if (y0 == null) return; const dy = Math.max(0, e.touches[0].clientY - y0); sh.style.transition = 'none'; sh.style.transform = `translateY(${dy}px)`; }, {passive:true});
+  head.addEventListener('touchend', e => { if (y0 == null) return; const dy = e.changedTouches[0].clientY - y0; y0 = null; sh.style.transition = ''; if (dy > 90) close(); else sh.style.transform = ''; }, {passive:true});
+  document.addEventListener('keydown', esc, true);
+  document.body.classList.add('lock'); document.body.append(bg);
+  paint(); go2.focus();
+}
+function renderArchiveList(){
+  if (!A.built) return;
+  if (A.stop) A.stop();
+  const host = $('#alist'); host.innerHTML = '';
+  host.nextSibling && host.nextSibling.classList && host.nextSibling.classList.contains('more') && host.nextSibling.remove();
+  const list = archiveList();
+  if (!list.length) {
+    const e = el('div', 'empty'); e.append(el('h2', null, 'No puns found'), el('p', null, 'Try another word, or clear the filters.'));
+    host.append(e); return;
+  }
+  const box = el('div', A.view === 'grid' ? 'grid' : 'list'); host.append(box);
+  if (A.view === 'grid') {
+    A.stop = paged(box, list, j => { const a = art(j); a.tabIndex = 0; a.addEventListener('click', () => openSingle(j)); a.addEventListener('keydown', e => { if (e.key === 'Enter') openSingle(j); }); return a; }, 36);
+  } else {
+    A.stop = paged(box, list, j => {
+      const b = el('button', 'li au-' + j.a); b.type = 'button';
+      // text first: punchline big, explanation small, who + when; one emoji for what the joke is about
+      const bd = el('span', 'b');
+      const t = el('span', 't', j.big); t.dir = 'auto'; bd.append(t);
+      if (j.small) { const e = el('span', 'e', j.small.replace(/\s*\|\|\s*/g, '\n')); e.dir = 'auto'; bd.append(e); }
+      const m = el('span', 'm'); m.dir = isRtl(j.big) ? 'rtl' : 'ltr'; m.append(avatar(j.a), el('span', null, AUTH[j.a].name + ' · ' + fmtShort.format(d8(j.date))));
+      bd.append(m);
+      const em = el('span', 'emo', j.emo[0]); em.setAttribute('aria-hidden', 'true');
+      b.append(bd, em); b.addEventListener('click', () => openSingle(j));
+      return b;
+    }, 40);
+  }
+}
+
+/* single post view (from the archive grid) */
+let single = null;
+function openSingle(j){
+  closeSingle();
+  const v = el('div', 'single'); v.setAttribute('role', 'dialog'); v.setAttribute('aria-modal', 'true'); v.setAttribute('aria-label', 'Post');
+  const top = el('div', 'top'); const inn = el('div', 'col in');
+  const back = el('button', 'iconbtn'); back.type = 'button'; back.innerHTML = svg('back'); back.setAttribute('aria-label', 'Back');
+  back.addEventListener('click', closeSingle);
+  inn.append(back, el('h2', 'pagetitle', 'Post'), el('span', null)); inn.lastChild.style.width = '40px';
+  top.append(inn); v.append(top);
+  const c = el('div', 'col'); c.append(post(j)); v.append(c);
+  const esc = e => { if (e.key === 'Escape' && !document.querySelector('.sheet-bg')) closeSingle(); };
+  document.addEventListener('keydown', esc);
+  // swipe sideways (either way) to go back to the archive; the page follows the finger
+  let sx = null, sy = 0, sdx = 0;
+  v.addEventListener('touchstart', e => { if (e.touches.length === 1) { sx = e.touches[0].clientX; sy = e.touches[0].clientY; sdx = 0; } }, {passive:true});
+  v.addEventListener('touchmove', e => {
+    if (sx == null) return;
+    const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
+    if (!sdx && Math.abs(dy) > Math.abs(dx)) { sx = null; return; }
+    sdx = dx; v.style.transition = 'none'; v.style.transform = `translateX(${dx}px)`;
+  }, {passive:true});
+  v.addEventListener('touchend', () => {
+    if (sx == null) return; sx = null;
+    v.style.transition = 'transform .25s cubic-bezier(.2,.8,.2,1)';
+    if (Math.abs(sdx) > 70) { v.style.transform = `translateX(${sdx > 0 ? 100 : -100}%)`; setTimeout(closeSingle, 220); }
+    else v.style.transform = '';
+  }, {passive:true});
+  single = {v, esc, pf:document.activeElement};
+  document.body.append(v); document.body.classList.add('lock'); back.focus(); paintLikes();
+}
+function closeSingle(){
+  if (!single) return;
+  single.v.remove(); document.removeEventListener('keydown', single.esc); document.body.classList.remove('lock');
+  single.pf && single.pf.focus && single.pf.focus(); single = null;
+}
+
+/* ---------- liked ---------- */
+let stopLiked = null;
+function renderLiked(){
+  likedDirty = false;
+  if (stopLiked) stopLiked();
+  const v = $('#v-liked'); v.innerHTML = '';
+  const list = J.filter(j => rCount(j.id) > 0).sort((x, y) => rCount(y.id) - rCount(x.id) || y.date.localeCompare(x.date));
+  if (!list.length) {
+    const e = el('div', 'empty'); const big = el('div', 'big'); big.innerHTML = svg('heart'); e.append(big);
+    e.append(el('h2', null, 'Nothing liked yet'));
+    e.append(el('p', null, R.ready ? 'Double-tap a pun on Home. Anything anyone likes shows up here.' : 'Likes are shared between everyone who opens this page from its link.'));
+    v.append(e); return;
+  }
+  const feed = el('div', 'feed'); v.append(feed);
+  stopLiked = paged(feed, list, post, 8);
+}
+
+addEventListener('hashchange', () => { const h = location.hash.slice(1); if (h !== S.tab && TABS.some(t => t.id === h)) go(h); });
+buildNav();
+buildHome();
+go((location.hash || '').slice(1) || 'home');
+})();
+</script>
+
+</body></html>
