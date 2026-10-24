@@ -225,6 +225,42 @@ button{cursor:pointer;background:none;border:0;padding:0}
 .toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:90;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 48px);animation:up2 .25s}
 @keyframes up2{from{opacity:0;transform:translate(-50%,10px)}}
 
+/* share: busy/done button, snapshot ghost, receipt pill */
+.act{position:relative}
+.act.busy .ico{opacity:0}
+.act.busy::after{content:"";position:absolute;inset:0;margin:auto;width:20px;height:20px;border-radius:50%;border:2.5px solid color-mix(in srgb,currentColor 25%,transparent);border-top-color:currentColor;animation:spin .7s linear infinite}
+.act.done{color:#22c55e}
+.act.done .ico{animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
+.ghost{position:fixed;z-index:95;margin:0;pointer-events:none;transform-origin:0 0;overflow:hidden;will-change:transform}
+.ghost .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+.spill{position:fixed;left:0;right:0;margin:0 auto;bottom:calc(88px + env(safe-area-inset-bottom,0px));z-index:90;
+  width:min(420px,calc(100% - 24px));display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:12px;
+  padding:9px 8px 9px 9px;border-radius:20px;background:color-mix(in srgb,var(--elev) 82%,transparent);
+  -webkit-backdrop-filter:blur(22px) saturate(1.8);backdrop-filter:blur(22px) saturate(1.8);
+  box-shadow:0 12px 34px rgba(0,0,0,.22),inset 0 0 0 1px color-mix(in srgb,var(--ink) 9%,transparent);
+  animation:spill-in .5s cubic-bezier(.3,1.35,.5,1) both;touch-action:none;transition:transform .2s,opacity .2s}
+.spill.out{opacity:0;transform:translateY(16px) scale(.97)}
+@keyframes spill-in{from{opacity:0;transform:translateY(28px) scale(.94)}}
+.spill .thumb{width:44px;height:55px;border-radius:8px;overflow:hidden;background:var(--surface);flex:none}
+.spill .thumb img{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transform:scale(.6);transition:opacity .2s,transform .35s cubic-bezier(.3,1.6,.5,1)}
+.spill.landed .thumb img{opacity:1;transform:none}
+.spill .thumb.none{display:grid;place-items:center}
+.spill .txt{display:grid;gap:1px;min-width:0}
+.spill .txt b{display:flex;align-items:center;gap:6px;font:600 15px/1.25 var(--body)}
+.spill .txt .sub{font-size:13px;line-height:1.3;color:var(--ink-2)}
+.spill .ok{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40}
+.spill.landed .ok{animation:draw .45s .1s cubic-bezier(.3,.7,.3,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.spill.k-copied .ok{color:#22c55e}
+.spill.k-saved .ok{color:var(--link)}
+.spill.k-failed .ok,.spill.k-declined .ok{color:var(--like)}
+.spill .sbtn{height:34px;padding:0 14px;border-radius:17px;background:var(--link);color:#fff;font:600 14px var(--body);white-space:nowrap;transition:transform .15s}
+.spill .sbtn:active{transform:scale(.94)}
+.spill .x{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:var(--ink-2)}
+.spill .x .ico{width:18px;height:18px}
+.spreview{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.85);display:grid;place-items:center;padding:24px;animation:fade .2s;cursor:zoom-out}
+.spreview img{max-width:100%;max-height:100%;border-radius:12px;animation:spill-in .35s cubic-bezier(.3,1.35,.5,1)}
+
 .rise{animation:rise .45s cubic-bezier(.2,.8,.2,1) both}
 @keyframes rise{from{opacity:0;transform:translateY(16px)}}
 
@@ -2157,6 +2193,7 @@ const P = {
   share:'<path d="M12 15V3.5M7.5 8 12 3.5 16.5 8"/><path d="M5 12.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-6.5"/>',
   save:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4.5 19.5h15"/>',
   filter:'<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   copy:'<rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5a1.5 1.5 0 0 0-1.5-1.5H5A1.5 1.5 0 0 0 3.5 5v9A1.5 1.5 0 0 0 5 15.5h3.5"/>'
 };
 const svg = (name, cls) => `<svg class="ico${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" aria-hidden="true">${P[name]}</svg>`;
@@ -2320,7 +2357,7 @@ function post(j, i){
   p.append(a);
   const acts = el('div', 'acts');
   const sh = el('button', 'act'); sh.type = 'button'; sh.innerHTML = svg('send'); sh.setAttribute('aria-label', 'Share');
-  sh.addEventListener('click', () => openShare(j));
+  sh.addEventListener('click', () => openShare(j, a, sh));
   acts.append(likeBtn(j), sh);
   p.append(acts);
   const body = el('div', 'pbody');
@@ -2584,7 +2621,7 @@ function showFrame(){
   const ft = el('div', 'ft');
   const n = el('span', 'n'); n.dataset.likes = j.id; n.dataset.short = '1';
   const sh = el('button', 'act'); sh.type = 'button'; sh.innerHTML = svg('send'); sh.setAttribute('aria-label', 'Share');
-  sh.addEventListener('click', () => openShare(j));
+  sh.addEventListener('click', () => openShare(j, a, sh));
   ft.append(n, likeBtn(j), sh); f.append(ft);
   if (!store.get('storyHint', false)) { f.append(el('div', 'hint', 'Tap to go on · hold to pause · swipe down to close')); store.set('storyHint', true); }
   SV.el = 0; SV.dur = 4500 + Math.min(4000, ([...j.t].length + [...j.e].length) * 45);
@@ -2664,28 +2701,145 @@ async function renderPng(j){
   return new Promise(res => c.toBlob(b => res({blob:b, url:c.toDataURL('image/png')}), 'image/png'));
 }
 const shareText = j => j.t + (j.e ? '\n' + j.e : '') + '\n— ' + AUTH[j.a].name;
-/* Share = copy the post as an image to the clipboard; fall back to saving it, then to copying the text */
-async function openShare(j, onDone){
+/* Share = copy the post as an image. The moment is shown, not just told: the tapped button spins, the post
+   "snaps" (a quick flash), a copy of it flies into a receipt pill above the menu that shows the real image,
+   says what happened and what to do next. Fallbacks (saved / text only / failed) use the same pill. */
+const SHARE_GLYPH = {
+  copied:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  saved:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4.5 19.5h15"/>',
+  text:'<path d="M5 7h14M5 12h14M5 17h9"/>',
+  declined:'<path d="M6 6l12 12M18 6 6 18"/>',
+  failed:'<path d="M12 7.5v6M12 17h.01"/><circle cx="12" cy="12" r="9"/>'
+};
+const SHARE_COPY = {
+  copied:['Image copied', 'Paste it in WhatsApp or any chat'],
+  saved:['Image saved', 'Find it in your downloads'],
+  text:['Copied as text', 'Images can’t be copied here, so the text is ready to paste'],
+  declined:['Not saved', 'Nothing was copied'],
+  failed:['Couldn’t copy', 'You can save the image instead']
+};
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+async function saveImage(png){
+  if (window.claude && window.claude.use) {
+    const dl = await claude.use('downloads');
+    if (dl) { await dl.save({filename:'hloptech-pun.png', data:png.blob}); return; }
+  }
+  const a = document.createElement('a'); a.href = png.url; a.download = 'hloptech-pun.png'; document.body.append(a); a.click(); a.remove();
+}
+async function openShare(j, fromEl, btn){
+  if (btn && btn.classList.contains('busy')) return;
+  if (btn) btn.classList.add('busy');
   const png = renderPng(j);
+  let kind = 'copied';
   try {
     if (!window.ClipboardItem || !navigator.clipboard || !navigator.clipboard.write) throw new Error('no clipboard');
+    // the promise keeps Safari's user-gesture window open while the image renders
     await navigator.clipboard.write([new ClipboardItem({'image/png': png.then(r => r.blob)})]);
-    toast('Image copied — paste it anywhere');
   } catch {
-    try {
-      const dl = await claude?.use?.('downloads');
-      if (!dl) throw new Error('no downloads');
-      await dl.save({filename:'hloptech-pun.png', data:(await png).blob});
-      toast('Copying images isn’t allowed here, so it was saved instead');
-    } catch (e) {
-      if (e && e.code === 'declined') { toast('Not saved'); }
+    try { await saveImage(await png); kind = 'saved'; }
+    catch (e) {
+      if (e && e.code === 'declined') kind = 'declined';
       else {
-        try { await navigator.clipboard.writeText(shareText(j)); toast('Copied the text instead'); }
-        catch { toast('Couldn’t copy here'); }
+        try { await navigator.clipboard.writeText(shareText(j)); kind = 'text'; }
+        catch { kind = 'failed'; }
       }
     }
   }
-  onDone && onDone();
+  const img = await png.catch(() => null);
+  const good = kind === 'copied' || kind === 'saved';
+  if (btn) {
+    btn.classList.remove('busy');
+    if (good) {
+      const was = btn.innerHTML; btn.innerHTML = svg('check'); btn.classList.add('done');
+      setTimeout(() => { btn.innerHTML = was; btn.classList.remove('done'); }, 1600);
+    }
+  }
+  if (good) { try { navigator.vibrate && navigator.vibrate(15); } catch {} }
+  const pill = sharePill(kind, img, j);
+  if (good && img && fromEl && fromEl.isConnected && !reduceMotion()) await shareFlight(fromEl, pill.target);
+  pill.land();
+}
+
+/* a copy of the post lifts off, flashes like a shutter, and arcs down into the pill's thumbnail */
+function shareFlight(fromEl, dst){
+  const src = fromEl.getBoundingClientRect();
+  if (!src.width || !dst.width) return Promise.resolve();
+  const ghost = fromEl.cloneNode(true);
+  ghost.querySelectorAll('.burst').forEach(n => n.remove());
+  ghost.classList.add('ghost');
+  Object.assign(ghost.style, {left:src.left + 'px', top:src.top + 'px', width:src.width + 'px', height:src.height + 'px'});
+  const flash = el('div', 'flash'); ghost.append(flash);
+  document.body.append(ghost);
+  flash.animate([{opacity:0}, {opacity:.85, offset:.25}, {opacity:0}], {duration:260, easing:'ease-out'});
+  const s = dst.width / src.width, dx = dst.left - src.left, dy = dst.top - src.top;
+  const anim = ghost.animate([
+    {transform:'translate(0,0) scale(1)', borderRadius:'6px', boxShadow:'0 0 0 rgba(0,0,0,0)'},
+    {transform:'translate(0,-10px) scale(1.035)', borderRadius:'10px', boxShadow:'0 18px 40px rgba(0,0,0,.35)', offset:.28},
+    {transform:`translate(${dx * .4}px, ${dy * .55 - 30}px) scale(${(1 + s) / 2.6})`, borderRadius:'14px', offset:.62},
+    {transform:`translate(${dx}px, ${dy}px) scale(${s})`, borderRadius:`${8 / s}px`, boxShadow:'0 2px 6px rgba(0,0,0,.2)'}
+  ], {duration:820, delay:120, easing:'cubic-bezier(.45,0,.2,1)', fill:'forwards'});
+  return anim.finished.catch(() => {}).then(() => ghost.remove());
+}
+
+/* the receipt: real thumbnail, what happened, what to do next */
+let pillNow = null;
+function sharePill(kind, png, j){
+  if (pillNow) pillNow.close(true);
+  const [title, sub] = SHARE_COPY[kind];
+  const p = el('div', 'spill k-' + kind); p.setAttribute('role', 'status'); p.setAttribute('aria-live', 'polite');
+  const thumb = el('button', 'thumb'); thumb.type = 'button'; thumb.setAttribute('aria-label', 'Preview the image');
+  if (png) { const im = el('img'); im.src = png.url; im.alt = ''; thumb.append(im); } else thumb.classList.add('none');
+  const txt = el('div', 'txt');
+  const t = el('b'); t.append(el('span', null, title)); t.insertAdjacentHTML('beforeend', `<svg class="ok" viewBox="0 0 24 24" aria-hidden="true">${SHARE_GLYPH[kind]}</svg>`);
+  txt.append(t, el('span', 'sub', sub));
+  p.append(thumb, txt);
+  if (png && (kind === 'copied' || kind === 'saved')) {
+    const file = new File([png.blob], 'hloptech-pun.png', {type:'image/png'});
+    if (navigator.canShare && navigator.canShare({files:[file]})) {
+      const b = el('button', 'sbtn', 'Share…'); b.type = 'button';
+      b.addEventListener('click', () => { navigator.share({files:[file]}).catch(() => {}); close(); });
+      p.append(b);
+    }
+  }
+  if (png && kind === 'failed') {
+    const b = el('button', 'sbtn', 'Save image'); b.type = 'button';
+    b.addEventListener('click', async () => { try { await saveImage(png); close(); sharePill('saved', png, j).land(); } catch {} });
+    p.append(b);
+  }
+  const x = el('button', 'x'); x.type = 'button'; x.innerHTML = svg('close'); x.setAttribute('aria-label', 'Dismiss');
+  p.append(x);
+  document.body.append(p);
+  // where the thumbnail ends up once the pill has finished sliding in (measured with the entry animation off)
+  p.style.animation = 'none'; const target = thumb.getBoundingClientRect(); void p.offsetWidth; p.style.animation = '';
+  const storyWasPaused = SV ? SV.paused : null;
+  if (SV) SV.paused = true;
+  let timer = null, closed = false;
+  const arm = ms => { clearTimeout(timer); timer = setTimeout(close, ms); };
+  function close(instant){
+    if (closed) return; closed = true; clearTimeout(timer);
+    if (SV && storyWasPaused === false) SV.paused = false;
+    if (pillNow && pillNow.el === p) pillNow = null;
+    if (instant) { p.remove(); return; }
+    p.classList.add('out'); setTimeout(() => p.remove(), 220);
+  }
+  x.addEventListener('click', () => close());
+  thumb.addEventListener('click', () => { if (!png) return; clearTimeout(timer); previewImage(png.url, () => arm(2500)); });
+  // swipe down to dismiss; touching it holds it open
+  let y0 = null;
+  p.addEventListener('pointerdown', e => { clearTimeout(timer); if (!e.target.closest('button')) y0 = e.clientY; });
+  p.addEventListener('pointermove', e => { if (y0 == null) return; const dy = Math.max(0, e.clientY - y0); p.style.transform = `translateY(${dy}px)`; p.style.opacity = String(1 - dy / 120); });
+  p.addEventListener('pointerup', e => { if (y0 == null) { arm(3000); return; } const dy = e.clientY - y0; y0 = null; if (dy > 40) close(); else { p.style.transform = ''; p.style.opacity = ''; arm(3000); } });
+  const api = {el:p, thumb, target, close, land(){ p.classList.add('landed'); arm(kind === 'failed' ? 6000 : 4500); }};
+  pillNow = api;
+  return api;
+}
+function previewImage(url, onClose){
+  const bg = el('div', 'spreview'); bg.setAttribute('role', 'dialog'); bg.setAttribute('aria-label', 'Image preview');
+  const im = el('img'); im.src = url; im.alt = 'The copied image'; bg.append(im);
+  const done = () => { bg.remove(); document.removeEventListener('keydown', esc, true); onClose && onClose(); };
+  const esc = e => { if (e.key === 'Escape') { e.stopPropagation(); done(); } };
+  bg.addEventListener('click', done); document.addEventListener('keydown', esc, true);
+  document.body.append(bg);
 }
 
 /* ---------- archive ---------- */
