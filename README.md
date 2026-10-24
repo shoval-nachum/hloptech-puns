@@ -27,7 +27,7 @@ Hosting: GitHub Pages serves `index.html` from the `main` branch, so every push 
    The site will be at `https://<your-username>.github.io/hloptech-puns/`.
 
 ### 2. Firebase (shared likes)
-1. Go to https://console.firebase.google.com → **Add project** → name it `hloptech-puns` (Google Analytics: off).
+1. Go to https://console.firebase.google.com → **Add project** → name it (this one is `hloptegram`) (Google Analytics: off).
 2. **Build → Authentication → Get started → Sign-in method → Anonymous → Enable.**
 3. **Build → Firestore Database → Create database** → any location → start in **production mode**.
    Then open the **Rules** tab, paste the contents of `firestore.rules`, and **Publish**.
