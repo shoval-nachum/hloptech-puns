@@ -688,13 +688,7 @@ async function openShare(j, fromEl, btn){
   }
   const img = await png.catch(() => null);
   const good = kind === 'copied' || kind === 'saved';
-  if (btn) {
-    btn.classList.remove('busy');
-    if (good) {
-      const was = btn.innerHTML; btn.innerHTML = svg('check'); btn.classList.add('done');
-      setTimeout(() => { btn.innerHTML = was; btn.classList.remove('done'); }, 1600);
-    }
-  }
+  if (btn) btn.classList.remove('busy');   // the receipt carries the check; the button just returns
   if (good) { try { navigator.vibrate && navigator.vibrate(15); } catch {} }
   const pill = sharePill(kind, img, j);
   if (good && img && fromEl && fromEl.isConnected && !reduceMotion()) await shareFlight(fromEl, pill.target);
@@ -711,14 +705,14 @@ function shareFlight(fromEl, dst){
   Object.assign(ghost.style, {left:src.left + 'px', top:src.top + 'px', width:src.width + 'px', height:src.height + 'px'});
   const flash = el('div', 'flash'); ghost.append(flash);
   document.body.append(ghost);
-  flash.animate([{opacity:0}, {opacity:.85, offset:.25}, {opacity:0}], {duration:260, easing:'ease-out'});
+  flash.animate([{opacity:0}, {opacity:.85, offset:.25}, {opacity:0}], {duration:150, easing:'ease-out'});
   const s = dst.width / src.width, dx = dst.left - src.left, dy = dst.top - src.top;
   const anim = ghost.animate([
     {transform:'translate(0,0) scale(1)', borderRadius:'6px', boxShadow:'0 0 0 rgba(0,0,0,0)'},
-    {transform:'translate(0,-10px) scale(1.035)', borderRadius:'10px', boxShadow:'0 18px 40px rgba(0,0,0,.35)', offset:.28},
+    {transform:'translate(0,-10px) scale(1.035)', borderRadius:'10px', boxShadow:'0 18px 40px rgba(0,0,0,.35)', offset:.2},
     {transform:`translate(${dx * .4}px, ${dy * .55 - 30}px) scale(${(1 + s) / 2.6})`, borderRadius:'14px', offset:.62},
     {transform:`translate(${dx}px, ${dy}px) scale(${s})`, borderRadius:`${8 / s}px`, boxShadow:'0 2px 6px rgba(0,0,0,.2)'}
-  ], {duration:820, delay:120, easing:'cubic-bezier(.45,0,.2,1)', fill:'forwards'});
+  ], {duration:460, delay:40, easing:'cubic-bezier(.5,0,.15,1)', fill:'forwards'});
   return anim.finished.catch(() => {}).then(() => ghost.remove());
 }
 
@@ -1016,6 +1010,8 @@ function renderLiked(){
 addEventListener('hashchange', () => { const h = location.hash.slice(1); if (h !== S.tab && TABS.some(t => t.id === h)) go(h); });
 buildNav();
 buildHome();
+// warm the fonts the share image uses so the first share doesn't wait for them
+setTimeout(() => { try { ['800 80px Rubik','500 40px Rubik','600 34px Rubik'].forEach(f => document.fonts.load(f, 'אבגabc')); } catch {} }, 1200);
 go((location.hash || '').slice(1) || 'home');
 })();
 </script>
